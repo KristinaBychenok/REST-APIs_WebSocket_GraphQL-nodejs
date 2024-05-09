@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator')
 const Post = require('../models/post')
 const User = require('../models/user')
 const fs = require('fs')
+const io = require('../socket')
 
 const create422Error = (text) => {
   const error = new Error(text)
@@ -60,6 +61,7 @@ exports.getPosts = async (req, res, next) => {
     const totalItems = await Post.find().countDocuments()
     const posts = await Post.find()
       .populate('creator')
+      .sort({ createdAt: -1 })
       .skip((currentPage - 1) * perPage)
       .limit(perPage)
 
@@ -106,6 +108,11 @@ exports.createPost = async (req, res, next) => {
     user.posts.push(post)
 
     await user.save()
+
+    io.getIO().emit('posts', {
+      action: 'create',
+      post: { ...post._doc, creator: { _id: req.userId, name: user.name } },
+    })
 
     res.status(201).json({
       message: 'Success!',
@@ -158,11 +165,11 @@ exports.updatePost = async (req, res, next) => {
   }
 
   try {
-    const post = await Post.findById(postId)
+    const post = await Post.findById(postId).populate('creator')
     if (!post) {
       create422Error('Could not find post.')
     }
-    if (post.creator.toString() !== req.userId) {
+    if (post.creator._id.toString() !== req.userId) {
       const error = new Error('Not Authorization!')
       error.statusCode = 403
       throw error
@@ -175,6 +182,7 @@ exports.updatePost = async (req, res, next) => {
     post.imageUrl = imageUrl
     const updatedPost = await post.save()
 
+    io.getIO().emit('posts', { action: 'update', post: updatedPost })
     res.status(200).json({ message: 'Post updated!', post: updatedPost })
   } catch (error) {
     if (!error.statusCode) {
@@ -204,6 +212,8 @@ exports.deletePost = async (req, res, next) => {
     const user = await User.findById(req.userId)
     user.posts.pull(postId)
     await user.save()
+
+    io.getIO().emit('posts', { action: 'delete', post: postId })
 
     res.status(200).json({ message: 'Post deleted!' })
   } catch (error) {

@@ -60,6 +60,11 @@ mongoose
     'mongodb+srv://user-1:T0reIlJGKuOY7URm@cluster0.a0ycx1c.mongodb.net/posts?retryWrites=true&w=majority&appName=Cluster0'
   )
   .then((res) => {
-    app.listen(8080)
+    const server = app.listen(8080)
+    const io = require('./socket').init(server)
+
+    io.on('connection', (socket) => {
+      console.log('Connected client!')
+    })
   })
   .catch((err) => console.log(err))
