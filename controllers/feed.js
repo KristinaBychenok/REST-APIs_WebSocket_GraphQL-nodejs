@@ -2,7 +2,6 @@ const { validationResult } = require('express-validator')
 const Post = require('../models/post')
 const User = require('../models/user')
 const fs = require('fs')
-const io = require('../socket')
 
 const create422Error = (text) => {
   const error = new Error(text)
